@@ -21,11 +21,10 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// Register a new user
+// ✅ Register a new user
 async function user(req, res) {
     try {
         const { uname, email, password } = req.body;
-        
 
         // Check if user already exists
         const existingUser = await User.findOne({ email });
@@ -47,17 +46,22 @@ async function user(req, res) {
             { expiresIn: '1h' }
         );
 
-        res.status(201).json({ token, user: userData, message: "Account created successfully!" });
+        res.status(201).json({ 
+            token, 
+            userId: userData._id,  
+            username: userData.name,
+            message: "Account created successfully!" 
+        });
     } catch (error) {
         console.error(error.message);
         res.status(500).json({ message: "Signup failed", error: error.message });
     }
 }
-// login
 
+// ✅ Login
 async function login(req, res) {
     try {
-        console.log("hii")
+        console.log("Login attempt received");
         const { email, password } = req.body;
 
         // Find the user by email
@@ -65,6 +69,11 @@ async function login(req, res) {
 
         if (!userData) {
             return res.status(404).json({ message: "User not found" });
+        }
+
+        // 🚨 Prevent blocked users from logging in
+        if (userData.isBlocked) {
+            return res.status(403).json({ message: "Your account is blocked. Contact support." });
         }
 
         // Check if the password matches
@@ -76,12 +85,16 @@ async function login(req, res) {
         // Generate JWT token
         const token = jwt.sign(
             { userId: userData._id, email: userData.email },
-            process.env.JWT_SECRET, // Make sure your .env file has JWT_SECRET
+            process.env.JWT_SECRET,
             { expiresIn: '1h' }
         );
 
-        // Send response with token
-        return res.status(200).json({ message: "Login successful", token });
+        return res.status(200).json({ 
+            message: "Login successful", 
+            token, 
+            userId: userData._id,  
+            username: userData.name 
+        });
 
     } catch (error) {
         console.error("Login error:", error);
@@ -89,16 +102,57 @@ async function login(req, res) {
     }
 }
 
+// ✅ Get all users (Admin only)
+async function getAllUsers(req, res) {
+    try {
+        const users = await User.find({}, '-password'); // Exclude password field
+        res.status(200).json(users);
+    } catch (error) {
+        res.status(500).json({ message: "Failed to fetch users", error: error.message });
+    }
+}
 
-// Home route (protected)
+// ✅ Toggle block/unblock user (Admin only)
+async function toggleBlockUser(req, res) {
+    try {
+        const { userId } = req.params;
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        user.isBlocked = !user.isBlocked;
+        await user.save();
+
+        res.status(200).json({ message: `User ${user.isBlocked ? 'blocked' : 'unblocked'} successfully` });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to update user status", error: error.message });
+    }
+}
+
+// ✅ Home route (protected)
 async function home(req, res) {
-    console.log('home');
+    console.log('Home route accessed');
     res.json({ data: "products", user: req.user });
 }
+// ✅ Get the count of all users (Admin only)
+async function getUserCount(req, res) {
+    try {
+        const userCount = await User.countDocuments(); // Count total users
+        res.status(200).json({ users: userCount });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to fetch user count", error: error.message });
+    }
+}
+
 
 module.exports = {
     user,
     login,
     home,
-    authenticateToken
+    authenticateToken,
+    getAllUsers,
+    toggleBlockUser,
+    getUserCount
 };

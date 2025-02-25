@@ -1,15 +1,27 @@
 const express = require('express');
 const userRouter = express.Router();
 const userController = require('../controllers/userController');
-const auth = require('../middlewares/userAuth');
+const userAuth = require('../middlewares/userAuth');
+const adminAuth = require('../middlewares/adminAuth'); // Add separate admin auth
 
-// Route to register a new user (Fixed Route)
-userRouter.post('/', userController.user); // Now works as POST /user
+// ✅ Register a new user
+userRouter.post('/', userController.user);
 
-// Route to login a user
-userRouter.post('/login', userController.login); // Works as POST /user/login
+// ✅ User login
+userRouter.post('/login', userController.login);
 
-// Protected route to get user data after login
-userRouter.get('/home', auth, userController.home); // Works as GET /user/home
+// ✅ Protected route (For logged-in users)
+userRouter.get('/home', userAuth, userController.home);
+
+// ✅ Admin-only route: Get all users
+userRouter.get('/all', adminAuth, userController.getAllUsers); 
+
+// ✅ Admin-only route: Block/unblock user
+userRouter.patch('/block/:userId', adminAuth, userController.toggleBlockUser);
+
+
+// ✅ Admin-only route: Get total user count
+userRouter.get('/count', adminAuth, userController.getUserCount);
+
 
 module.exports = userRouter;
